@@ -225,6 +225,12 @@ Given list of epubs will be merged together into one new epub.
                       help="Keep original metadata files in merged epub.  Use for UnMerging.",)
     optparser.add_option("-s", "--source", dest="sourceopt", default=None,
                       help="Include URL as dc:source and dc:identifier(opf:scheme=URL).", metavar="URL")
+    optparser.add_option("--no-fix",
+                      action="store_false", dest="fixopt", default=True,
+                      help="Skip EPUB post-processing fixes (DOCTYPE, SVG images, etc).",)
+    optparser.add_option("--fix",
+                      action="store_true", dest="fixopt", default=True,
+                      help="Apply EPUB post-processing fixes (default).",)
 
     optparser.add_option("-u", "--unmerge",
                       action="store_true", dest="unmerge",
@@ -268,7 +274,8 @@ Given list of epubs will be merged together into one new epub.
                 flattentoc=options.flattentoc,
                 coverjpgpath=options.coveropt,
                 keepmetadatafiles=options.keepmeta,
-                source=options.sourceopt
+                source=options.sourceopt,
+                fix=options.fixopt,
                 )
 
 def cond_print(flag,arg):
@@ -298,6 +305,7 @@ def doMerge(outputio,
             coverjpgpath=None,
             keepmetadatafiles=False,
             source=None,
+            fix=True,
             notify_progress=lambda x:x):
     '''
     outputio = output file name or BytesIO.
@@ -875,6 +883,22 @@ div { margin: 0pt; padding: 0pt; }
 
     printt("closed outputepub:%s"%(time()-t))
     t = time()
+
+    # Post-process: fix common EPUB issues (DOCTYPE, SVG images, corrupt XML, etc.)
+    if fix:
+        try:
+            from calibre_plugins.epubmerge.epubfixer import EpubFixer
+        except ImportError:
+            from epubmerge.epubfixer import EpubFixer
+        if isinstance(outputio, str):
+            notify_progress(0.95)
+            printt("Running EPUB post-process fixer...")
+            fixer = EpubFixer(outputio, outputio)
+            fixer.run()
+            printt("fixer completed:%s" % (time() - t))
+            t = time()
+        else:
+            logger.warning("--fix skipped: output is not a file path (BytesIO not supported by fixer)")
 
     return (source,filecount)
 
